@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import { createProductRoutes } from './infrastructure/web/routes/productRoutes';
 import { ProductController } from './infrastructure/web/controllers/ProductController';
 import { InMemoryProductRepository } from './infrastructure/database/InMemoryProductRepository';
-
+import 'dotenv/config';
 // Use Cases
 import { CreateProduct } from './application/use-cases/CreateProduct';
 import { GetAllProducts } from './application/use-cases/GetAllProducts';
