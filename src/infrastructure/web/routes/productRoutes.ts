@@ -5,24 +5,23 @@ import { jwtMiddleware } from '../middlewares/jwtMiddleware';
 export const createProductRoutes = (productController: ProductController): Router => {
     const router = Router();
 
-    // GET ALL - Obtener todos los productos
+    // GET ALL - público
     router.get('/', productController.getAll);
 
-    // GET by ID - Obtener producto por ID
+    // GET by ID - público
     router.get('/:id', productController.getById);
 
-    // POST - Crear nuevo producto
-    // PUNTO 2: Agregar middleware JWT aquí -> router.post('/', jwtMiddleware, productController.create);
+    // POST - protegido
     router.post('/', jwtMiddleware, productController.create);
 
-    // PUT - Actualizar producto completo
-    router.put('/:id', productController.update);
+    // PUT - protegido
+    router.put('/:id', jwtMiddleware, productController.update);
 
-    // PATCH - Actualizar producto parcialmente
-    router.patch('/:id', productController.partialUpdate);
+    // PATCH - protegido
+    router.patch('/:id', jwtMiddleware, productController.partialUpdate);
 
-    // DELETE - Eliminar producto
-    router.delete('/:id', productController.remove);
+    // DELETE - protegido
+    router.delete('/:id', jwtMiddleware, productController.remove);
 
     return router;
 };

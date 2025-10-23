@@ -21,6 +21,12 @@ export interface ProductData {
     color: string;
     brand: string;
     subcategory: Subcategory;
+    createdAt?: string;
+    updatedAt?: string;
+    createdBy?: string;
+    updatedBy?: string;
+    deletedAt?: string;
+    version?: number;
 }
 
 export class Product {
@@ -33,6 +39,12 @@ export class Product {
     color: string;
     brand: string;
     subcategory: Subcategory;
+    createdAt?: string;
+    updatedAt?: string;
+    createdBy?: string;
+    updatedBy?: string;
+    deletedAt?: string;
+    version?: number;
 
     constructor(data: ProductData) {
         this.id = data.id;
@@ -44,6 +56,12 @@ export class Product {
         this.color = data.color;
         this.brand = data.brand;
         this.subcategory = data.subcategory;
+        this.createdAt = data.createdAt;
+        this.updatedAt = data.updatedAt;
+        this.createdBy = data.createdBy;
+        this.updatedBy = data.updatedBy;
+        this.deletedAt = data.deletedAt;
+        this.version = data.version;
     }
 
     validate(): boolean {
@@ -52,6 +70,9 @@ export class Product {
         }
         if (!this.price || this.price <= 0) {
             throw new Error('Product price must be greater than 0');
+        }
+        if (this.stock < 0) {
+            throw new Error('Product stock cannot be negative');
         }
         if (!this.subcategory) {
             throw new Error('Subcategory is required');

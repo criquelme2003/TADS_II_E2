@@ -22,6 +22,11 @@ export const typeDefs = `
     color: String!
     brand: String!
     subcategory: Subcategory!
+    createdAt: String
+    updatedAt: String
+    createdBy: String
+    updatedBy: String
+    version: Int
   }
 
   input CategoryInput {

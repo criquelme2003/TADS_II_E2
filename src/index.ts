@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { createProductRoutes } from './infrastructure/web/routes/productRoutes';
 import { ProductController } from './infrastructure/web/controllers/ProductController';
-import { InMemoryProductRepository } from './infrastructure/database/InMemoryProductRepository';
+import { PrismaProductRepository } from './infrastructure/database/PrismaProductRepository';
 import 'dotenv/config';
 
 // Use Cases
@@ -26,7 +26,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Dependency Injection
-const productRepository = new InMemoryProductRepository();
+const productRepository = new PrismaProductRepository();
 
 const useCases = {
     createProduct: new CreateProduct(productRepository),

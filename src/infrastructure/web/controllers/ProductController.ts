@@ -34,7 +34,8 @@ export class ProductController {
 
     create = async (req: Request, res: Response): Promise<void> => {
         try {
-            const product = await this.createProduct.execute(req.body);
+            const userId = req.user?.id || req.user?.email;
+            const product = await this.createProduct.execute(req.body, userId);
             res.status(201).json({
                 success: true,
                 message: 'Product created successfully',
@@ -81,9 +82,11 @@ export class ProductController {
 
     update = async (req: Request, res: Response): Promise<void> => {
         try {
+            const userId = req.user?.id || req.user?.email;
             const product = await this.updateProduct.execute(
                 parseInt(req.params.id),
-                req.body
+                req.body,
+                userId
             );
             res.status(200).json({
                 success: true,
@@ -100,9 +103,11 @@ export class ProductController {
 
     partialUpdate = async (req: Request, res: Response): Promise<void> => {
         try {
+            const userId = req.user?.id || req.user?.email;
             const product = await this.partialUpdateProduct.execute(
                 parseInt(req.params.id),
-                req.body
+                req.body,
+                userId
             );
             res.status(200).json({
                 success: true,

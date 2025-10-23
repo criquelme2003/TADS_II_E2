@@ -1,5 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 
+declare global {
+    namespace Express {
+        interface Request {
+            user?: {
+                id: string;
+                email?: string;
+            };
+        }
+    }
+}
+
 export const jwtMiddleware = (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
 
@@ -13,6 +24,10 @@ export const jwtMiddleware = (req: Request, res: Response, next: NextFunction) =
     const token = authHeader.substring(7);
 
     if (token === process.env.JWT_SECRET) {
+        req.user = {
+            id: 'admin',
+            email: 'admin@example.com'
+        };
         return next();
     }
 
