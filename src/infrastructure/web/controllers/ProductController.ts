@@ -67,7 +67,11 @@ export class ProductController {
 
     getById = async (req: Request, res: Response): Promise<void> => {
         try {
-            const product = await this.getProductById.execute(parseInt(req.params.id));
+            const productId = Number.parseInt(req.params.id, 10);
+            if (!Number.isSafeInteger(productId)) {
+                throw new Error('Invalid product id');
+            }
+            const product = await this.getProductById.execute(productId);
             res.status(200).json({
                 success: true,
                 data: product
@@ -83,8 +87,12 @@ export class ProductController {
     update = async (req: Request, res: Response): Promise<void> => {
         try {
             const userId = req.user?.id || req.user?.email;
+            const productId = Number.parseInt(req.params.id, 10);
+            if (!Number.isSafeInteger(productId)) {
+                throw new Error('Invalid product id');
+            }
             const product = await this.updateProduct.execute(
-                parseInt(req.params.id),
+                productId,
                 req.body,
                 userId
             );
@@ -104,8 +112,12 @@ export class ProductController {
     partialUpdate = async (req: Request, res: Response): Promise<void> => {
         try {
             const userId = req.user?.id || req.user?.email;
+            const productId = Number.parseInt(req.params.id, 10);
+            if (!Number.isSafeInteger(productId)) {
+                throw new Error('Invalid product id');
+            }
             const product = await this.partialUpdateProduct.execute(
-                parseInt(req.params.id),
+                productId,
                 req.body,
                 userId
             );
@@ -124,7 +136,11 @@ export class ProductController {
 
     remove = async (req: Request, res: Response): Promise<void> => {
         try {
-            const product = await this.deleteProduct.execute(parseInt(req.params.id));
+            const productId = Number.parseInt(req.params.id, 10);
+            if (!Number.isSafeInteger(productId)) {
+                throw new Error('Invalid product id');
+            }
+            const product = await this.deleteProduct.execute(productId);
             res.status(200).json({
                 success: true,
                 message: 'Product deleted successfully',

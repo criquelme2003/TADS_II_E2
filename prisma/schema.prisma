@@ -8,12 +8,12 @@ datasource db {
 }
 
 model Category {
-  id            Int       @id @default(autoincrement())
-  name          String    @unique
+  id            Int           @id @default(autoincrement())
+  name          String        @unique
   description   String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   subcategories Subcategory[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
 }
 
 model Subcategory {
@@ -21,10 +21,10 @@ model Subcategory {
   name        String
   description String
   categoryId  Int
-  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  products    Product[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  products    Product[]
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 }
 
 model Product {
@@ -37,14 +37,13 @@ model Product {
   color         String
   brand         String
   subcategoryId Int
-  subcategory   Subcategory @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
-  
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   createdBy     String?
   updatedBy     String?
-  deletedAt     DateTime?   
+  deletedAt     DateTime?
   version       Int         @default(1)
+  subcategory   Subcategory @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
 
   @@index([subcategoryId])
 }
