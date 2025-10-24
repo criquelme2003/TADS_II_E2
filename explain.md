@@ -1,7 +1,7 @@
 # Cumplimiento de los Requerimientos OWASP y Testing
 
 
-1. Aplicar al menos tres controles alineados a OWASP Top 10 en la API de productos.
+1. Aplicar al controles alineados a OWASP Top 10 en la API de productos.
 2. Incorporar **al menos 5 pruebas de API**.
 
 ---
