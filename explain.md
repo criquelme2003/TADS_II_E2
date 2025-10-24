@@ -1,6 +1,5 @@
 # Cumplimiento de los Requerimientos OWASP y Testing
 
-Este documento resume cómo se atendieron las peticiones de:
 
 1. Aplicar al menos tres controles alineados a OWASP Top 10 en la API de productos.
 2. Incorporar **al menos 5 pruebas de API**.
@@ -10,7 +9,7 @@ Este documento resume cómo se atendieron las peticiones de:
 ## 1. Controles OWASP Top 10 añadidos
 
 - **A01:2021 – Broken Access Control**  
-  - Se reemplazó la validación insegura del token por una verificación real con `jsonwebtoken`.  
+  - verificación con `jsonwebtoken`.  
   - Archivo relevante: `src/infrastructure/web/middlewares/jwtMiddleware.ts:1-69`.  
   - Impacto: solo portadores de un JWT firmado con `JWT_SECRET` válido pueden acceder a los endpoints protegidos.
 
@@ -20,12 +19,46 @@ Este documento resume cómo se atendieron las peticiones de:
     - `src/infrastructure/web/middlewares/validationMiddleware.ts:1-45`  
     - `src/infrastructure/web/validation/productSchemas.ts:1-82`  
     - `src/infrastructure/web/routes/productRoutes.ts:1-54`  
-  - Impacto: se rechazan valores inválidos (por ejemplo, IDs no numéricos, precios negativos y campos ausentes).
+  - Se incorporó `helmet`.  
+  - sin Helmet:
+
+        Content-Length: 45
+
+        ETag: W/"2d-cNj29RQ25Pprcj6a6edy/V2YndQ"
+        
+        Date: Fri, 24 Oct 2025 10:51:59 GMT
+        
+        Connection: keep-alive
+        
+        Keep-Alive: timeout=5
+  - Con Helmet:
+
+        Cross-Origin-Resource-Policy: same-origin
+
+        Origin-Agent-Cluster: ?1
+
+        Referrer-Policy: no-referrer
+
+        Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+        X-Content-Type-Options: nosniff
+
+        X-DNS-Prefetch-Control: off
+
+        X-Download-Options: noopen
+
+        X-Frame-Options: SAMEORIGIN
+        X-Permitted-Cross-Domain-Policies: none
+
+        X-XSS-Protection: 0
+  - Impacto:endurece encabezados HTTP, se rechazan valores inválidos (por ejemplo, IDs no numéricos, precios negativos y campos ausentes).
 
 - **A07:2021 – Identification and Authentication Failures / Rate Limiting**  
-  - Se incorporó `express-rate-limit` y `helmet`, además de límites de tamaño de cuerpo (`express.json`/`urlencoded`).  
+  - Se incorporó `express-rate-limit `, además de límites de tamaño de cuerpo (`express.json`/`urlencoded`).  
+
   - Archivo: `src/index.ts:1-123`.  
-  - Impacto: endurece encabezados HTTP, bloquea flooding de peticiones y evita payloads excesivos que podrían derivar en DoS.
+  - Impacto:  bloquea flooding de peticiones y evita payloads excesivos que podrían derivar en DoS.
+
 
 ---
 
@@ -46,6 +79,7 @@ Este documento resume cómo se atendieron las peticiones de:
 
 ---
 
+
 ## 3. Pasos de despliegue / variables relevantes
 
 - Asegurar que existan variables de entorno:
@@ -55,7 +89,3 @@ Este documento resume cómo se atendieron las peticiones de:
 
 ---
 
-## 4. Validación final
-
-- Compilación TypeScript (`npm run build`) y pruebas (`npm run test`) completadas sin errores.
-- Se mantienen rutas REST / GraphQL originales, ahora protegidas y validadas.

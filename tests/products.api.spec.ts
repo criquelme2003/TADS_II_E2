@@ -1,6 +1,7 @@
 import type { Express } from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import { describe, beforeAll, it, expect } from 'vitest';
 
 const buildAuthToken = (payload: Record<string, unknown> = {}) => {
     const secret = process.env.JWT_SECRET;
@@ -46,10 +47,10 @@ describe('Products API', () => {
     beforeAll(async () => {
         authToken = buildAuthToken();
         const module = await import('../src/index');
-        app = module.default;
+        app = module.default as Express;
     });
 
-    it('rejects protected calls without a bearer token', async () => {
+    it('Rechazar petición post sin token', async () => {
         const response = await request(app).post('/api/products').send(basePayload);
         expect(response.status).toBe(401);
         expect(response.body).toMatchObject({
@@ -58,7 +59,7 @@ describe('Products API', () => {
         });
     });
 
-    it('creates a product when payload and token are valid', async () => {
+    it('Crear producto con validación de payload y token', async () => {
         const response = await request(app)
             .post('/api/products')
             .set('Authorization', `Bearer ${authToken}`)
@@ -77,7 +78,26 @@ describe('Products API', () => {
         expect(createdProductId).toBeGreaterThan(0);
     });
 
-    it('blocks malformed product payloads', async () => {
+    const buildLargePayload = () => {
+        const targetSizeBytes = 99 * 1024;
+        const clone = JSON.parse(JSON.stringify(basePayload));
+        clone.name = 'Large Payload Product';
+        const baseWithoutPadding = { ...clone, padding: '' };
+        const baseSize = Buffer.byteLength(JSON.stringify(baseWithoutPadding));
+        const fillerLength = Math.max(0, targetSizeBytes - baseSize);
+        clone.padding = 'X'.repeat(fillerLength);
+
+        let payloadSize = Buffer.byteLength(JSON.stringify(clone));
+        if (payloadSize >= 102400) {
+            const overshoot = payloadSize - 102399;
+            clone.padding = clone.padding.slice(0, -overshoot);
+            payloadSize = Buffer.byteLength(JSON.stringify(clone));
+        }
+
+        return { clone, payloadSize };
+    };
+
+    it('Bloqueo de payloads malformados', async () => {
         const invalidPayload = {
             ...basePayload,
             name: '',
@@ -95,7 +115,28 @@ describe('Products API', () => {
         });
     });
 
-    it('lists products publicly', async () => {
+    it('Permite payloads cercanos a 99kb sin exceder el límite', async () => {
+        const { clone: largePayload, payloadSize } = buildLargePayload();
+
+        expect(payloadSize).toBeGreaterThan(99 * 1024 - 512);
+        expect(payloadSize).toBeLessThan(102400);
+
+        const response = await request(app)
+            .post('/api/products')
+            .set('Authorization', `Bearer ${authToken}`)
+            .send(largePayload);
+
+        expect(response.status).toBe(201);
+        expect(response.body).toMatchObject({
+            success: true,
+            data: expect.objectContaining({
+                name: 'Large Payload Product'
+            })
+        });
+        expect(response.body.data.padding).toBeUndefined();
+    });
+
+    it('Listar productos publicos', async () => {
         const response = await request(app).get('/api/products');
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({
@@ -112,7 +153,7 @@ describe('Products API', () => {
         );
     });
 
-    it('applies partial updates securely', async () => {
+    it('aplicar actualización parcial de manera segura', async () => {
         const response = await request(app)
             .patch(`/api/products/${createdProductId}`)
             .set('Authorization', `Bearer ${authToken}`)

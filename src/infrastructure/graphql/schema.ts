@@ -27,7 +27,7 @@ export const typeDefs = `
     createdBy: String
     updatedBy: String
     version: Int
-  }
+  } 
 
   input CategoryInput {
     id: Int!
