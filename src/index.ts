@@ -38,7 +38,10 @@ const corsOptions: CorsOptions = config.security.allowAnyOrigin
           credentials: true
       }
     : {
-          origin: (origin, callback) => {
+          origin: (
+              origin: string | undefined,
+              callback: (err: Error | null, allow?: boolean) => void
+          ) => {
               if (!origin) {
                   return callback(null, true);
               }
