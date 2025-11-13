@@ -1,90 +1,60 @@
 # Cumplimiento de los Requerimientos OWASP y Testing
 
-
-1. Aplicar al menos controles alineados a OWASP Top 10 en la API de productos.
-2. Incorporar **al menos 5 pruebas de API**.
-
----
-
-## 1. Controles OWASP Top 10 añadidos
-
-- **A01:2021 – Broken Access Control**  
-  - verificación con `jsonwebtoken`.  
-  - Archivo relevante: `src/infrastructure/web/middlewares/jwtMiddleware.ts:1-69`.  
-  - Impacto: solo portadores de un JWT firmado con `JWT_SECRET` válido pueden acceder a los endpoints protegidos.
-
-- **A03:2021 – Injection / A05:2021 – Security Misconfiguration**  
-  - Se añadieron validaciones Zod antes de llegar a la lógica del controlador para sanitizar entradas y prevenir datos malformados o abusivos.  
-  - Archivos:  
-    - `src/infrastructure/web/middlewares/validationMiddleware.ts:1-45`  
-    - `src/infrastructure/web/validation/productSchemas.ts:1-82`  
-    - `src/infrastructure/web/routes/productRoutes.ts:1-54`  
-  - Se incorporó `helmet`.  
-  - sin Helmet:
-
-        Content-Length: 45
-
-        
-        Date: Fri, 24 Oct 2025 10:51:59 GMT
-        
-        Connection: keep-alive
-        
-        Keep-Alive: timeout=5
-  - Con Helmet:
-
-        Cross-Origin-Resource-Policy: same-origin
-
-        Origin-Agent-Cluster: ?1
-
-        Referrer-Policy: no-referrer
-
-        Strict-Transport-Security: max-age=31536000; includeSubDomains
-
-        X-Content-Type-Options: nosniff
-
-        X-DNS-Prefetch-Control: off
-
-        X-Download-Options: noopen
-
-        X-Frame-Options: SAMEORIGIN
-        X-Permitted-Cross-Domain-Policies: none
-
-        X-XSS-Protection: 0
-  - Impacto:endurece encabezados HTTP, se rechazan valores inválidos (por ejemplo, IDs no numéricos, precios negativos y campos ausentes).
-
-- **A07:2021 – Identification and Authentication Failures / Rate Limiting**  
-  - Se incorporó `express-rate-limit `, además de límites de tamaño de cuerpo (`express.json`/`urlencoded`).  
-
-  - Archivo: `src/index.ts:1-123`.  
-  - Impacto:  bloquea flooding de peticiones y evita payloads excesivos que podrían derivar en DoS.
-
+1. Aplicar controles alineados al OWASP Top 10:2025 (A01, A02, A04 y A09) en la API y en GraphQL.
+2. Mantener una batería de pruebas automatizadas que validen los nuevos controles.
 
 ---
 
-## 2. Pruebas de API implementadas
+## 1. Controles OWASP Top 10:2025 añadidos
 
-- Se añadió un repositorio en memoria (`src/infrastructure/database/InMemoryProductRepository.ts:1-108`) para ejecutar pruebas sin depender de Prisma.
-- Configuración de Vitest + SuperTest:
-  - `package.json:6-41` (script `npm run test` y dependencias).
-  - `vitest.config.ts:1-10` y `tests/setup.ts:1-2`.
-- Archivo de pruebas principal: `tests/products.api.spec.ts:1-130`.
-  - Casos cubiertos (5 tests):
-    1. Rechazar llamadas sin token (401).
-    2. Crear producto válido (201).
-    3. Bloquear payload malformado (400).
-    4. Listar productos (200).
-    5. Aplicar `PATCH` seguro (200).
-- Ejecución exitosa: `npm run test`.
+### A01:2025 – Broken Access Control
+- Se implementó autorización basada en roles mediante `requireRoles` y `assertRoles`, utilizada en todas las rutas REST mutables (`src/infrastructure/web/middlewares/authorizationMiddleware.ts:1-45`, `src/infrastructure/web/routes/productRoutes.ts:1-58`).
+- Las mutaciones GraphQL reutilizan el mismo guard y obtienen el usuario del contexto generado por `decodeAuthHeader`, de modo que los cambios de datos vía GraphQL quedan protegidos igual que REST (`src/infrastructure/graphql/resolvers.ts:1-40`, `src/index.ts:111-125`).
+- Impacto: solo los usuarios con el rol configurado (por defecto `product_admin`) pueden crear, actualizar o eliminar productos en cualquier interfaz.
+
+### A02:2025 – Security Misconfiguration
+- Se añadió un módulo central de configuración con Zod que valida PORT, límites de cuerpo, ventanillas de rate limit, rol requerido y obliga a que `APP_ALLOWED_ORIGINS` exista en producción (`src/config.ts:1-63`).
+- El servidor consume esa configuración para:  
+  - CORS con allowlist y registro de orígenes bloqueados (`src/index.ts:35-58`).  
+  - Helmet, body limit, y rate limiting homogéneo en `/api` y `/graphql` (`src/index.ts:32-75`).  
+  - Desactivar introspección y landing page GraphQL en producción (`src/index.ts:111-125`).
+- Impacto: se reducen configuraciones débiles por defecto y se fuerza a que cada entorno declare explícitamente sus parámetros críticos.
+
+### A04:2025 – Cryptographic Failures
+- `JWT_SECRET` debe tener al menos 32 caracteres y no puede ser textos débiles; la validación ocurre en el arranque vía Zod (`src/config.ts:13-19`).  
+- El middleware JWT solo acepta tokens HS256 firmados con el secreto validado y reutiliza la verificación tanto en REST como en GraphQL (`src/infrastructure/web/middlewares/jwtMiddleware.ts:1-105`).
+- El entorno de pruebas define un secreto largo para evitar falsos positivos y representar mejor producción (`tests/setup.ts:1-3`).
+- Impacto: se minimiza el riesgo de secretos triviales y algoritmos débiles, fortaleciendo la autenticación de portadores.
+
+### A09:2025 – Logging & Alerting Failures
+- Se introdujo un logger estructurado con Pino y se añadió a los puntos sensibles: decisiones de CORS, falta de token, autorizaciones fallidas y errores globales (`src/infrastructure/logging/logger.ts:1-10`, `src/index.ts:35-155`, `src/infrastructure/web/middlewares/jwtMiddleware.ts:30-105`, `src/infrastructure/web/middlewares/authorizationMiddleware.ts:25-45`).
+- Impacto: los eventos de seguridad quedan registrados con contexto (ruta, rol, origen), facilitando la generación de alertas y el monitoreo continuo.
 
 ---
 
+## 2. Pruebas de API y GraphQL
 
-## 3. Pasos de despliegue / variables relevantes
-
-- Asegurar que existan variables de entorno:
-  - `JWT_SECRET` – clave para firmar/verificar JWT.
-  - `RATE_LIMIT_MAX` y `RATE_LIMIT_WINDOW_MS` para ajustar el throttling.
-  - `REQUEST_BODY_LIMIT` si se quiere cambiar el tamaño máximo del cuerpo.
+- Repositorio en memoria para aislar las pruebas (`src/infrastructure/database/InMemoryProductRepository.ts:1-108`).
+- Configuración de Vitest + SuperTest (`package.json:6-42`, `vitest.config.ts:1-10`, `tests/setup.ts:1-3`).
+- Archivo principal de pruebas: `tests/products.api.spec.ts:1-225`. Casos cubiertos (9):
+  1. Bloqueo sin token (401).
+  2. Creación válida (201).
+  3. Rechazo por rol insuficiente (403).
+  4. Validación de payload malformado (400).
+  5. Manejo de payload ~99 KB dentro del límite.
+  6. Listado público.
+  7. `PATCH` seguro.
+  8. Mutación GraphQL sin auth (UNAUTHENTICATED).
+  9. Mutación GraphQL con rol válido.
+- Ejecución: `npm test` (Vitest) finaliza con 9 pruebas exitosas, lo cual garantiza que los nuevos controles se mantienen en la CI.
 
 ---
 
+## 3. Variables de entorno críticas
+
+- `JWT_SECRET` – mínimo 32 caracteres, sin frases débiles.
+- `APP_ALLOWED_ORIGINS` – obligatorio en producción, coma-separado.
+- `PRODUCT_WRITE_ROLE` – rol requerido para escrituras (default `product_admin`).
+- `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS`, `REQUEST_BODY_LIMIT`, `PORT`, `LOG_LEVEL` – ajustan los límites operativos definidos en `src/config.ts`.
+
+---

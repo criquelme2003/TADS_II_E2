@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { ProductController } from '../controllers/ProductController';
 import { jwtMiddleware } from '../middlewares/jwtMiddleware';
 import { validateRequest } from '../middlewares/validationMiddleware';
+import { requireRoles } from '../middlewares/authorizationMiddleware';
+import { config } from '../../../config';
 import {
     createProductSchema,
     updateProductSchema,
@@ -11,6 +13,7 @@ import {
 
 export const createProductRoutes = (productController: ProductController): Router => {
     const router = Router();
+    const productWriteRole = config.security.productWriteRole;
 
     // GET ALL - público
     router.get('/', productController.getAll);
@@ -22,6 +25,7 @@ export const createProductRoutes = (productController: ProductController): Route
     router.post(
         '/',
         jwtMiddleware,
+        requireRoles(productWriteRole),
         validateRequest({ body: createProductSchema }),
         productController.create
     );
@@ -30,6 +34,7 @@ export const createProductRoutes = (productController: ProductController): Route
     router.put(
         '/:id',
         jwtMiddleware,
+        requireRoles(productWriteRole),
         validateRequest({ params: idParamSchema, body: updateProductSchema }),
         productController.update
     );
@@ -38,6 +43,7 @@ export const createProductRoutes = (productController: ProductController): Route
     router.patch(
         '/:id',
         jwtMiddleware,
+        requireRoles(productWriteRole),
         validateRequest({ params: idParamSchema, body: partialProductSchema }),
         productController.partialUpdate
     );
@@ -46,6 +52,7 @@ export const createProductRoutes = (productController: ProductController): Route
     router.delete(
         '/:id',
         jwtMiddleware,
+        requireRoles(productWriteRole),
         validateRequest({ params: idParamSchema }),
         productController.remove
     );

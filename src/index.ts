@@ -1,6 +1,8 @@
 import express, { Request, Response, NextFunction, Application } from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import cors, { CorsOptions } from 'cors';
+import { ApolloServerPluginLandingPageDisabled } from 'apollo-server-core';
 import { createProductRoutes } from './infrastructure/web/routes/productRoutes';
 import { ProductController } from './infrastructure/web/controllers/ProductController';
 import { PrismaProductRepository } from './infrastructure/database/PrismaProductRepository';
@@ -20,25 +22,43 @@ import { ApolloServer } from 'apollo-server-express';
 import { makeExecutableSchema } from '@graphql-tools/schema';
 import { typeDefs } from './infrastructure/graphql/schema';
 import { createResolvers } from './infrastructure/graphql/resolvers';
+import { config } from './config';
+import { logger } from './infrastructure/logging/logger';
+import { decodeAuthHeader } from './infrastructure/web/middlewares/jwtMiddleware';
 
 const app: Application = express();
-const PORT = process.env.PORT || 3000;
-const BODY_LIMIT = process.env.REQUEST_BODY_LIMIT || '100kb';
+const PORT = config.port;
 
-app.disable('x-powered-by');
+ app.disable('x-powered-by');
 app.use(helmet());
 
-const parsePositiveNumber = (value: string | undefined, fallback: number): number => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-};
+const corsOptions: CorsOptions = config.security.allowAnyOrigin
+    ? {
+          origin: true,
+          credentials: true
+      }
+    : {
+          origin: (origin, callback) => {
+              if (!origin) {
+                  return callback(null, true);
+              }
 
-const rateLimitWindowMs = parsePositiveNumber(process.env.RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000);
-const rateLimitMax = parsePositiveNumber(process.env.RATE_LIMIT_MAX, 100);
+              if (config.security.allowedOrigins.includes(origin)) {
+                  return callback(null, true);
+              }
+
+              logger.warn({ origin }, 'Blocked disallowed origin');
+              return callback(new Error('Origin not allowed by CORS'), false);
+          },
+          credentials: true,
+          optionsSuccessStatus: 204
+      };
+
+app.use(cors(corsOptions));
 
 const apiLimiter = rateLimit({
-    windowMs: rateLimitWindowMs,
-    max: rateLimitMax,
+    windowMs: config.rateLimit.windowMs,
+    max: config.rateLimit.max,
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     message: {
@@ -48,8 +68,8 @@ const apiLimiter = rateLimit({
 });
 
 // Middleware
-app.use(express.json({ limit: BODY_LIMIT }));
-app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
+app.use(express.json({ limit: config.bodyLimit }));
+app.use(express.urlencoded({ extended: true, limit: config.bodyLimit }));
 
 app.use('/api', apiLimiter);
 app.use('/graphql', apiLimiter);
@@ -89,7 +109,16 @@ const schema = makeExecutableSchema({
 });
 
 async function startServer() {
-    const server = new ApolloServer({ schema });
+    const server = new ApolloServer({
+        schema,
+        introspection: config.graphql.enableIntrospection,
+        plugins: config.graphql.enableIntrospection
+            ? []
+            : [ApolloServerPluginLandingPageDisabled()],
+        context: ({ req }) => ({
+            user: decodeAuthHeader(req.headers.authorization)
+        })
+    });
 
     await server.start();
     server.applyMiddleware({ app: app as any, path: '/graphql' });
@@ -103,22 +132,26 @@ async function startServer() {
 
     // Error handler
     app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-        const errorStack = err instanceof Error ? err.stack : undefined;
-        if (errorStack) {
-            console.error(errorStack);
-        }
+        logger.error(
+            {
+                route: req.originalUrl,
+                method: req.method,
+                message: err.message,
+                stack: err.stack
+            },
+            'Unhandled error caught by global handler'
+        );
         res.status(500).json({
             success: false,
             message: 'Internal server error'
         });
     });
 
-    if (process.env.NODE_ENV !== 'test') {
+    if (config.nodeEnv !== 'test') {
         app.listen(PORT, () => {
-            console.log(`🚀 Server running on port ${PORT}`);
-            console.log(`📍 API: http://localhost:${PORT}/api/products`);
-            console.log(`💚 Health: http://localhost:${PORT}/health`);
-            console.log(`🔷 GraphQL: http://localhost:${PORT}/graphql`);
+            logger.info({ port: PORT }, 'Server running');
+            logger.info({ url: `/api/products` }, 'REST entry point ready');
+            logger.info({ url: `/graphql` }, 'GraphQL endpoint ready');
         });
     }
 }

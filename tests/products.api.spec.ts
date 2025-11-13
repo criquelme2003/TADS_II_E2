@@ -3,6 +3,7 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { describe, beforeAll, it, expect } from 'vitest';
 
+// A04:2025 - Cryptographic Failures: los tests usan un JWT firmado con el secreto reforzado.
 const buildAuthToken = (payload: Record<string, unknown> = {}) => {
     const secret = process.env.JWT_SECRET;
     if (!secret) {
@@ -12,6 +13,7 @@ const buildAuthToken = (payload: Record<string, unknown> = {}) => {
         {
             sub: 'tester',
             email: 'tester@example.com',
+            role: 'product_admin',
             ...payload
         },
         secret,
@@ -50,6 +52,7 @@ describe('Products API', () => {
         app = module.default as Express;
     });
 
+    // A01/A09:2025 - Broken Access Control + Logging; dispara logs de acceso sin credenciales.
     it('Rechazar petición post sin token', async () => {
         const response = await request(app).post('/api/products').send(basePayload);
         expect(response.status).toBe(401);
@@ -78,6 +81,20 @@ describe('Products API', () => {
         expect(createdProductId).toBeGreaterThan(0);
     });
 
+    // A01:2025 - Broken Access Control; asegura que el rol requerido sea obligatorio.
+    it('Bloquea escritura con rol insuficiente', async () => {
+        const response = await request(app)
+            .post('/api/products')
+            .set('Authorization', `Bearer ${buildAuthToken({ role: 'reader' })}`)
+            .send(basePayload);
+
+        expect(response.status).toBe(403);
+        expect(response.body).toMatchObject({
+            success: false,
+            message: expect.stringContaining('permission')
+        });
+    });
+
     const buildLargePayload = () => {
         const targetSizeBytes = 99 * 1024;
         const clone = JSON.parse(JSON.stringify(basePayload));
@@ -97,6 +114,7 @@ describe('Products API', () => {
         return { clone, payloadSize };
     };
 
+    // A02:2025 - Security Misconfiguration; valida que los esquemas corten payloads inválidos.
     it('Bloqueo de payloads malformados', async () => {
         const invalidPayload = {
             ...basePayload,
@@ -115,6 +133,7 @@ describe('Products API', () => {
         });
     });
 
+    // A02:2025 - Security Misconfiguration; respeta el límite de REQUEST_BODY_LIMIT configurado.
     it('Permite payloads cercanos a 99kb sin exceder el límite', async () => {
         const { clone: largePayload, payloadSize } = buildLargePayload();
 
@@ -166,6 +185,49 @@ describe('Products API', () => {
                 id: createdProductId,
                 stock: 30
             })
+        });
+    });
+
+    // A01/A09:2025 - Broken Access Control + Logging en la capa GraphQL.
+    it('Rechaza mutación GraphQL sin autenticación', async () => {
+        const response = await request(app)
+            .post('/graphql')
+            .send({
+                query: `mutation CreateProduct($input: ProductInput!) {
+                    createProduct(input: $input) { id }
+                }`,
+                variables: { input: basePayload }
+            });
+
+        expect(response.status).toBe(200);
+        expect(response.body.errors?.[0].message).toContain('Authentication required');
+    });
+
+    // A01:2025 - Broken Access Control; autoriza mutaciones solo con rol válido.
+    it('Permite mutación GraphQL con rol válido', async () => {
+        const response = await request(app)
+            .post('/graphql')
+            .set('Authorization', `Bearer ${authToken}`)
+            .send({
+                query: `mutation CreateProduct($input: ProductInput!) {
+                    createProduct(input: $input) {
+                        id
+                        name
+                        createdBy
+                    }
+                }`,
+                variables: {
+                    input: {
+                        ...basePayload,
+                        name: 'GraphQL Product'
+                    }
+                }
+            });
+
+        expect(response.status).toBe(200);
+        expect(response.body.data.createProduct).toMatchObject({
+            name: 'GraphQL Product',
+            createdBy: 'tester'
         });
     });
 });
